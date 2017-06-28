@@ -85,19 +85,19 @@ void rtcm3_decode_frame(const uint8_t *frame, uint32_t frame_length, struct rtcm
     break;
   }
   case 1005: {
-    rtcm_msg_1005 rtcm_msg_1005;
-    if (0 == rtcm3_decode_1005(&frame[byte], &rtcm_msg_1005)) {
+    rtcm_msg_1005 msg_1005;
+    if (0 == rtcm3_decode_1005(&frame[byte], &msg_1005)) {
       msg_base_pos_ecef_t sbp_base_pos;
-      rtcm3_1005_to_sbp(&rtcm_msg_1005, &sbp_base_pos);
+      rtcm3_1005_to_sbp(&msg_1005, &sbp_base_pos);
       state->cb(SBP_MSG_BASE_POS_ECEF, (u8)sizeof(sbp_base_pos), (u8 *)&sbp_base_pos);
     }
     break;
   }
   case 1006: {
-    rtcm_msg_1006 rtcm_msg_1006;
-    if (0 == rtcm3_decode_1006(&frame[byte], &rtcm_msg_1006)) {
+    rtcm_msg_1006 msg_1006;
+    if (0 == rtcm3_decode_1006(&frame[byte], &msg_1006)) {
       msg_base_pos_ecef_t sbp_base_pos;
-      rtcm3_1006_to_sbp(&rtcm_msg_1006, &sbp_base_pos);
+      rtcm3_1006_to_sbp(&msg_1006, &sbp_base_pos);
       state->cb(SBP_MSG_BASE_POS_ECEF, (u8)sizeof(sbp_base_pos), (u8 *)&sbp_base_pos);
     }
     break;
@@ -166,7 +166,7 @@ void add_obs_to_buffer(const rtcm_obs_message *new_rtcm_obs, gps_time_sec_t *obs
     // send through the current buffer and clear before adding new obs
     send_observations(state);
   }
-  
+
   // Copy new obs into buffer
   u8 obs_index_buffer = sbp_obs_buffer->header.n_obs;
   for(u8 obs_count = 0; obs_count < new_sbp_obs->header.n_obs; obs_count++) {
