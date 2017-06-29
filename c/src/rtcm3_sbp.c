@@ -10,7 +10,7 @@
  * WARRANTIES OF MERCHANTABILITY AND/OR FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#include <rtcm3_sbp.h>
+#include "rtcm3_sbp.h"
 #include <rtcm3_sbp_interface.h>
 #include <rtcm3_decode.h>
 #include <rtcm3_messages.h>
@@ -21,17 +21,9 @@
 #include <math.h>
 #include <string.h>
 
+void rtcm2sbp_init(struct rtcm3_sbp_state *state, void (*cb)(u8 msg_id, u8 length, u8 *buffer)) {
 
-struct rtcm3_sbp_state {
-  gps_time_sec_t time_from_rover_obs;
-  bool gps_time_updated;
-  s8 current_leap_seconds;
-  msg_obs_t *sbp_obs_buffer;
-  u8 obs_buffer[sizeof(observation_header_t) + MAX_OBS_PER_EPOCH * sizeof(packed_obs_content_t)];
-  void (*cb)(u8 msg_id, u8 buff, u8 *len);
-};
 
-void init(struct rtcm3_sbp_state *state, void (*cb)(u8 msg_id, u8 buff, u8 *len)) {
   state->time_from_rover_obs.wn = 0;
   state->time_from_rover_obs.tow = 0;
   state->gps_time_updated = false;
@@ -48,7 +40,7 @@ static double gps_diff_time(const gps_time_sec_t *end, const gps_time_sec_t *beg
   return dt;
 }
 
-void rtcm3_decode_frame(const uint8_t *frame, uint32_t frame_length, struct rtcm3_sbp_state *state) {
+void rtcm2sbp_decode_frame(const uint8_t *frame, uint32_t frame_length, struct rtcm3_sbp_state *state) {
 
   if (!state->gps_time_updated || frame_length < 1) {
     return;
@@ -418,7 +410,7 @@ void sbp_to_rtcm3_1006(const msg_base_pos_ecef_t *sbp_base_pos,
   rtcm_1006->ant_height = 0.0;
 }
 
-void set_gps_time(gps_time_sec_t *current_time, struct rtcm3_sbp_state* state)
+void rtcm2sbp_set_gps_time(gps_time_sec_t *current_time, struct rtcm3_sbp_state* state)
 {
   state->time_from_rover_obs.wn = current_time->wn;
   state->time_from_rover_obs.tow = current_time->tow;

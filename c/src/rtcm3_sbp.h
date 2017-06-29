@@ -27,7 +27,6 @@
 #define SBP_OBS_SIZE 17
 #define MAX_SBP_PAYLOAD 255
 #define MAX_OBS_IN_SBP ((MAX_SBP_PAYLOAD - SBP_HEADER_SIZE) / SBP_OBS_SIZE)
-#define MAX_OBS_PER_EPOCH 56
 
 extern bool rtcm3_debug;
 
