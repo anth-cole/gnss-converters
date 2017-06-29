@@ -23,7 +23,6 @@
 
 void rtcm2sbp_init(struct rtcm3_sbp_state *state, void (*cb)(u8 msg_id, u8 length, u8 *buffer)) {
 
-
   state->time_from_rover_obs.wn = 0;
   state->time_from_rover_obs.tow = 0;
   state->gps_time_updated = false;

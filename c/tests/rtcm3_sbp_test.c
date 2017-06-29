@@ -15,31 +15,35 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-
-
-void test_RTCM3_decode(void){
-
-  FILE* fp = fopen("../../tests/data/20170222_gps_ephemeris_331200.rtcm3","rb");
-
-  if(fp == NULL){
-    fprintf(stderr, "Can't open input file!\n");
-    exit(1);
-  }
-
-
-
-  return;
-}
-
 void sbp_callback(u8 msg_id, u8 length, u8 *buffer){
   (void)msg_id;
   (void)length;
   (void)buffer;
 }
 
-int main(void) {
+void test_RTCM3_decode(void){
+
 
   struct rtcm3_sbp_state state;
   rtcm2sbp_init(&state, sbp_callback);
+
+  FILE* fp = fopen("../../tests/data/20170222_gps_ephemeris_331200.rtcm3","rb");
+
+  u8 buffer[2048];
+
+  if(fp == NULL){
+    fprintf(stderr, "Can't open input file!\n");
+    exit(1);
+  }
+
+  fread(buffer, 2048, 1, fp);
+
+  rtcm2sbp_decode_frame(buffer, 2048, &state);
+
+
+  return;
+}
+
+int main(void) {
   test_RTCM3_decode();
 }
