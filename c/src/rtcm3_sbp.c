@@ -10,8 +10,8 @@
  * WARRANTIES OF MERCHANTABILITY AND/OR FITNESS FOR A PARTICULAR PURPOSE.
  */
 
-#include "rtcm3_sbp.h"
-#include <rtcm3_sbp_interface.h>
+#include "rtcm3_sbp_internal.h"
+#include <rtcm3_sbp.h>
 #include <rtcm3_decode.h>
 #include <rtcm3_messages.h>
 #include <sbp.h>
@@ -26,6 +26,9 @@ void rtcm2sbp_init(struct rtcm3_sbp_state *state, void (*cb)(u8 msg_id, u8 lengt
   state->time_from_rover_obs.wn = 0;
   state->time_from_rover_obs.tow = 0;
   state->gps_time_updated = false;
+
+  state->leap_seconds = 0;
+  state->leap_second_known = false;
 
   state->sbp_obs_buffer = (msg_obs_t *)(state->obs_buffer);
   state->cb = cb;
@@ -96,38 +99,34 @@ void rtcm2sbp_decode_frame(const uint8_t *frame, uint32_t frame_length, struct r
   case 1007:
   case 1008:
     break;
-//  case 1010: {
-//    rtcm_obs_message new_rtcm_obs;
-//    if (rtcm3_decode_1010(&frame[byte], &new_rtcm_obs) == 0 ) {
-//      // Need to check if we've got obs in the buffer from the previous epoch and send before accepting the new message
-//      convert_glo_to_gps_time(&new_rtcm_obs);
-//      add_obs_to_buffer(&rtcm_msg, &new_rtcm_obs);
-//      if (rtcm_msg.header.sync == 0) {
-//        encode_RTCM_obs(&rtcm_msg);
-//      }
-//    }
-//    break;
-//  }
-//  case 1012: {
-//    rtcm_obs_message new_rtcm_obs;
-//    if (rtcm3_decode_1012(&frame[byte], &new_rtcm_obs) == 0 ) {
-//      // Need to check if we've got obs in the buffer from the previous epoch and send before accepting the new message
-//      convert_glo_to_gps_time(&new_rtcm_obs);
-//      add_obs_to_buffer(&rtcm_msg, &new_rtcm_obs);
-//      if (rtcm_msg.header.sync == 0) {
-//        encode_RTCM_obs(&rtcm_msg);
-//      }
-//    }
-//    break;
-//  }
+  case 1010: {
+    rtcm_obs_message new_rtcm_obs;
+    if (rtcm3_decode_1010(&frame[byte], &new_rtcm_obs) == 0 && state->leap_second_known) {
+      add_glo_obs_to_buffer(&new_rtcm_obs, state);
+    }
+    break;
+  }
+  case 1012: {
+    rtcm_obs_message new_rtcm_obs;
+    if (rtcm3_decode_1012(&frame[byte], &new_rtcm_obs) == 0 && state->leap_second_known) {
+      add_glo_obs_to_buffer(&new_rtcm_obs, state);
+    }
+    break;
+  }
   default:
     break;
   }
 
 }
 
-void add_gps_obs_to_buffer(const rtcm_obs_message *new_rtcm_obs, struct rtcm3_sbp_state *state) {
+void add_glo_obs_to_buffer(const rtcm_obs_message *new_rtcm_obs, struct rtcm3_sbp_state *state) {
+  gps_time_sec_t obs_time;
+  compute_glo_time(new_rtcm_obs->header.tow, &obs_time, &state->time_from_rover_obs, state->leap_seconds);
 
+  add_obs_to_buffer(new_rtcm_obs, &obs_time, state);
+}
+
+void add_gps_obs_to_buffer(const rtcm_obs_message *new_rtcm_obs, struct rtcm3_sbp_state *state) {
   gps_time_sec_t obs_time;
   compute_gps_time(new_rtcm_obs->header.tow, &obs_time, &state->time_from_rover_obs);
 
@@ -416,6 +415,11 @@ void rtcm2sbp_set_gps_time(gps_time_sec_t *current_time, struct rtcm3_sbp_state*
   state->gps_time_updated = true;
 }
 
+void rtcm2sbp_set_leap_second(s8 leap_seconds, struct rtcm3_sbp_state *state) {
+  state->leap_seconds = leap_seconds;
+  state->leap_second_known = true;
+}
+
 void compute_gps_time(double tow, gps_time_sec_t *obs_time, const gps_time_sec_t *rover_time) {
 
   obs_time->tow = tow;
@@ -426,4 +430,20 @@ void compute_gps_time(double tow, gps_time_sec_t *obs_time, const gps_time_sec_t
   } else if (timediff > 302400) {
     obs_time->wn = rover_time->wn - 1;
   }
+}
+
+void compute_glo_time(double tod, gps_time_sec_t *obs_time, const gps_time_sec_t *rover_time, const s8 leap_second){
+  //Need to work out DOW from GPS time first
+  int rover_dow = rover_time->tow % 86400;
+  int rover_tod = rover_time->tow - rover_dow * 86400;
+
+  obs_time->wn = rover_time->wn;
+  // Check for day rollover
+  if(tod - rover_tod > 43200) {
+    rover_dow = (rover_dow + 1) % 7;
+  } else if(rover_tod - tod > 43200) {
+    rover_dow = (rover_dow - 1) % 7;
+  }
+  obs_time->tow = rover_dow * 86400 + tod + leap_second;
+
 }

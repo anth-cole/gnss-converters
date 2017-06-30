@@ -11,7 +11,7 @@
  */
 
 #include "rtcm3_sbp_test.h"
-#include <rtcm3_sbp_interface.h>
+#include <rtcm3_sbp.h>
 #include <stdio.h>
 #include <stdlib.h>
 

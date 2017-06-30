@@ -14,7 +14,7 @@
 #define GNSS_CONVERTERS_RTCM3_SBP_H
 
 #include <rtcm3_messages.h>
-#include <rtcm3_sbp_interface.h>
+#include <rtcm3_sbp.h>
 
 #define MSG_OBS_P_MULTIPLIER ((double)5e1)
 #define MSG_OBS_CN0_MULTIPLIER ((float)4)
@@ -69,9 +69,13 @@ void rtcm3_to_sbp(const rtcm_obs_message *rtcm_obs, msg_obs_t *sbp_obs);
 
 void add_gps_obs_to_buffer(const rtcm_obs_message *new_rtcm_obs, struct rtcm3_sbp_state *state);
 
+void add_glo_obs_to_buffer(const rtcm_obs_message *new_rtcm_obs, struct rtcm3_sbp_state *state);
+
 void add_obs_to_buffer(const rtcm_obs_message *new_rtcm_obs, gps_time_sec_t *new_sbp_obs, struct rtcm3_sbp_state *state);
 
 void compute_gps_time(double tow, gps_time_sec_t *new_sbp_obs, const gps_time_sec_t *rover_time);
+
+void compute_glo_time(double tod, gps_time_sec_t *obs_time, const gps_time_sec_t *rover_time, const s8 leap_second);
 
 void send_observations(struct rtcm3_sbp_state *state);
 
