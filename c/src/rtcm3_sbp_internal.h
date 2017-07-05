@@ -28,6 +28,9 @@
 #define MAX_SBP_PAYLOAD 255
 #define MAX_OBS_IN_SBP ((MAX_SBP_PAYLOAD - SBP_HEADER_SIZE) / SBP_OBS_SIZE)
 
+#define MS_TO_S 1e-3
+#define S_TO_MS 1e3
+
 extern bool rtcm3_debug;
 
 /** Code identifier. */
@@ -73,9 +76,9 @@ void add_glo_obs_to_buffer(const rtcm_obs_message *new_rtcm_obs, struct rtcm3_sb
 
 void add_obs_to_buffer(const rtcm_obs_message *new_rtcm_obs, gps_time_sec_t *new_sbp_obs, struct rtcm3_sbp_state *state);
 
-void compute_gps_time(double tow, gps_time_sec_t *new_sbp_obs, const gps_time_sec_t *rover_time);
+void compute_gps_time(double tow_ms, gps_time_sec_t *new_sbp_obs, const gps_time_sec_t *rover_time);
 
-void compute_glo_time(double tod, gps_time_sec_t *obs_time, const gps_time_sec_t *rover_time, const s8 leap_second);
+void compute_glo_time(double tod_ms, gps_time_sec_t *obs_time, const gps_time_sec_t *rover_time, const s8 leap_second);
 
 void send_observations(struct rtcm3_sbp_state *state);
 

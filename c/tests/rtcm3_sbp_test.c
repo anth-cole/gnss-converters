@@ -14,13 +14,20 @@
 #include <rtcm3_sbp.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <assert.h>
 
 #define MAX_FILE_SIZE 26000
 
 void sbp_callback(u8 msg_id, u8 length, u8 *buffer){
-  (void)msg_id;
-  (void)length;
-  (void)buffer;
+  (void) length;
+  (void) buffer;
+  static uint32_t msg_count = 0;
+  if(msg_count == 3 || msg_count == 19 || msg_count == 41) {
+    assert(msg_id == SBP_MSG_BASE_POS_ECEF);
+  } else {
+    assert(msg_id == SBP_MSG_OBS);
+  }
+  msg_count++;
 }
 
 void test_RTCM3_decode(void){
@@ -30,8 +37,9 @@ void test_RTCM3_decode(void){
   rtcm2sbp_init(&state, sbp_callback);
   gps_time_sec_t current_time;
   current_time.wn = 1945;
-  current_time.tow = 350000;
+  current_time.tow = 277500;
   rtcm2sbp_set_gps_time(&current_time,&state);
+  rtcm2sbp_set_leap_second(18,&state);
 
   FILE* fp = fopen("../../tests/data/RTCM3.bin","rb");
 
