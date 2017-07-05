@@ -15,6 +15,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#define MAX_FILE_SIZE 26000
+
 void sbp_callback(u8 msg_id, u8 length, u8 *buffer){
   (void)msg_id;
   (void)length;
@@ -26,19 +28,30 @@ void test_RTCM3_decode(void){
 
   struct rtcm3_sbp_state state;
   rtcm2sbp_init(&state, sbp_callback);
+  gps_time_sec_t current_time;
+  current_time.wn = 1945;
+  current_time.tow = 350000;
+  rtcm2sbp_set_gps_time(&current_time,&state);
 
-  FILE* fp = fopen("../../tests/data/20170222_gps_ephemeris_331200.rtcm3","rb");
+  FILE* fp = fopen("../../tests/data/RTCM3.bin","rb");
 
-  u8 buffer[2048];
+  u8 buffer[MAX_FILE_SIZE];
 
   if(fp == NULL){
     fprintf(stderr, "Can't open input file!\n");
     exit(1);
   }
 
-  fread(buffer, 2048, 1, fp);
 
-  rtcm2sbp_decode_frame(buffer, 2048, &state);
+  uint32_t file_size = fread(buffer, 1, MAX_FILE_SIZE, fp);
+  uint32_t buffer_index = 0;
+  while (buffer_index < file_size) {
+
+    if (buffer[buffer_index] == 0xD3) {
+      rtcm2sbp_decode_frame(&buffer[buffer_index], MAX_FILE_SIZE - buffer_index, &state);
+    }
+    buffer_index++;
+  }
 
 
   return;

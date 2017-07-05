@@ -20,6 +20,8 @@
 #include <libsbp/navigation.h>
 #include <math.h>
 #include <string.h>
+#include <observation.h>
+#include <ndb.h>
 
 void rtcm2sbp_init(struct rtcm3_sbp_state *state, void (*cb)(u8 msg_id, u8 length, u8 *buffer)) {
 
@@ -44,7 +46,7 @@ static double gps_diff_time(const gps_time_sec_t *end, const gps_time_sec_t *beg
 
 void rtcm2sbp_decode_frame(const uint8_t *frame, uint32_t frame_length, struct rtcm3_sbp_state *state) {
 
-  if (!state->gps_time_updated || frame_length < 1) {
+  if (state->gps_time_updated == false || frame_length < 1) {
     return;
   }
 
@@ -163,6 +165,8 @@ void add_obs_to_buffer(const rtcm_obs_message *new_rtcm_obs, gps_time_sec_t *obs
     sbp_obs_buffer->obs[obs_index_buffer] = new_sbp_obs->obs[obs_count];
     obs_index_buffer++;
   }
+  sbp_obs_buffer->header.n_obs = obs_index_buffer;
+  sbp_obs_buffer->header.t = new_sbp_obs->header.t;
 
   // If we aren't expecting another message, send the buffer
   if (new_rtcm_obs->header.sync == 0) {
@@ -187,16 +191,20 @@ void send_observations(struct rtcm3_sbp_state *state) {
       (msg_obs_t * )(obs_data + (msg_num * sizeof(observation_header_t) +
                                  MAX_OBS_IN_SBP * msg_num *
                                  sizeof(packed_obs_content_t)));
-    sbp_obs[msg_num]->header = sbp_obs_buffer->header;
+    sbp_obs[msg_num]->header.t = sbp_obs_buffer->header.t;
+    sbp_obs[msg_num]->header.n_obs = 0;
     u8 obs_index;
     for (obs_index = 0; obs_index < MAX_OBS_IN_SBP && obs_count < sbp_obs_buffer->header.n_obs; obs_index++) {
       sbp_obs[msg_num]->obs[obs_index] = sbp_obs_buffer->obs[obs_count++];
+      sbp_obs[msg_num]->header.n_obs++;
     }
     sizes[msg_num] = sizeof(observation_header_t) + obs_index * sizeof(packed_obs_content_t);
   }
 
   for (u8 msg = 0; msg < msg_num; ++msg) {
-    state->cb(SBP_MSG_OBS, sizes[msg], (u8 *)sbp_obs[msg]);
+    if(sbp_obs[msg]->header.n_obs > 0) {
+      state->cb(SBP_MSG_OBS, sizes[msg], (u8 *) sbp_obs[msg]);
+    }
   }
   memset((void*)sbp_obs_buffer,0, sizeof(*sbp_obs_buffer));
 }
@@ -259,6 +267,54 @@ double decode_lock_time(u8 sbp_lock_time) {
   return (double)ms_lock_time / SECS_MS;
 }
 
+bool gps_obs_message(u16 msg_num) {
+  if(msg_num == 1001 || msg_num == 1002 || msg_num == 1003 || msg_num == 1004) {
+    return true;
+  }
+  return false;
+}
+
+bool glo_obs_message(u16 msg_num) {
+  if(msg_num == 1009 || msg_num == 1010 || msg_num == 1011 || msg_num == 1012) {
+    return true;
+  }
+  return false;
+}
+
+code_t get_gps_sbp_code(u8 freq, u8 rtcm_code) {
+  code_t code = CODE_INVALID;
+  if (freq == L1_FREQ) {
+    if (rtcm_code == 0) {
+      code = CODE_GPS_L1CA;
+    } else {
+      code = CODE_GPS_L1P;
+    }
+  } else if (freq == L2_FREQ) {
+    if (rtcm_code == 0) {
+      code = CODE_GPS_L2CM;
+    } else {
+      code = CODE_GPS_L2P;
+    }
+  }
+  return code;
+}
+
+code_t get_glo_sbp_code(u8 freq, u8 rtcm_code) {
+  code_t code = CODE_INVALID;
+  if (freq == L1_FREQ) {
+    if (rtcm_code == 0) {
+      code = CODE_GLO_L1CA;
+    }
+    /* CODE_GLO_L1P currently not supported in sbp */
+  } else if (freq == L2_FREQ) {
+    if (rtcm_code == 0) {
+      code = CODE_GLO_L2CA;
+    }
+    /* CODE_GLO_L2P currently not supported in sbp */
+  }
+  return code;
+}
+
 void rtcm3_to_sbp(const rtcm_obs_message *rtcm_obs, msg_obs_t *new_sbp_obs) {
 
   new_sbp_obs->header.n_obs = 0;
@@ -269,8 +325,6 @@ void rtcm3_to_sbp(const rtcm_obs_message *rtcm_obs, msg_obs_t *new_sbp_obs) {
 
         packed_obs_content_t *sbp_freq =
           &new_sbp_obs->obs[new_sbp_obs->header.n_obs];
-        sbp_freq->sid.sat = rtcm_obs->sats[sat].svId;
-        sbp_freq->sid.code = rtcm_freq->code;
         sbp_freq->flags = 0;
         sbp_freq->P = 0.0;
         sbp_freq->L.i = 0;
@@ -279,18 +333,12 @@ void rtcm3_to_sbp(const rtcm_obs_message *rtcm_obs, msg_obs_t *new_sbp_obs) {
         sbp_freq->D.f = 0.0;
         sbp_freq->cn0 = 0.0;
         sbp_freq->lock = 0.0;
-        if (freq == L1_FREQ) {
-          if (rtcm_freq->code == 0) {
-            sbp_freq->sid.code = CODE_GPS_L1CA;
-          } else {
-            sbp_freq->sid.code = CODE_GPS_L1P;
-          }
-        } else if (freq == L2_FREQ) {
-          if (rtcm_freq->code == 0) {
-            sbp_freq->sid.code = CODE_GPS_L2CM;
-          } else {
-            sbp_freq->sid.code = CODE_GPS_L2P;
-          }
+
+        sbp_freq->sid.sat = rtcm_obs->sats[sat].svId;
+        if(gps_obs_message(rtcm_obs->header.msg_num)) {
+          get_gps_sbp_code(freq,rtcm_obs->sats[sat].obs[freq].code);
+        } else if (glo_obs_message(rtcm_obs->header.msg_num)) {
+          get_glo_sbp_code(freq,rtcm_obs->sats[sat].obs[freq].code);
         }
 
         if (rtcm_freq->flags.valid_pr == 1) {

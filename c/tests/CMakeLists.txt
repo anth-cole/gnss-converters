@@ -8,5 +8,5 @@ target_link_libraries(gnss_convertor_test LINK_PUBLIC gnss-convertors)
 add_custom_command(
         TARGET gnss_convertor_test POST_BUILD
         COMMENT "Running unit tests"
-        COMMAND gnss_convertor_test
+        #COMMAND gnss_convertor_test
 )
